@@ -11,8 +11,10 @@ static u64 parseOctal(const char *s, int len)
     u64 val = 0;
     for (int i = 0; i < len; i++) {
         char c = s[i];
-        if (c == '\0' || c == ' ') break;
-        if (c < '0' || c > '7') break;
+        if (c == '\0' || c == ' ')
+            break;
+        if (c < '0' || c > '7')
+            break;
         val = (val << 3) + (u64)(c - '0');
     }
     return val;
@@ -21,13 +23,16 @@ static u64 parseOctal(const char *s, int len)
 static int isZeroBlock(const unsigned char header[TAR_BLOCK_SIZE])
 {
     for (int i = 0; i < TAR_BLOCK_SIZE; i++) {
-        if (header[i] != 0) return 0;
+        if (header[i] != 0)
+            return 0;
     }
     return 1;
 }
 
-ArtTarEntry *findTarEntry(const char *filename) {
-    if (!filename || !s_tarIndex || s_tarCount == 0) return NULL;
+ArtTarEntry *findTarEntry(const char *filename)
+{
+    if (!filename || !s_tarIndex || s_tarCount == 0)
+        return NULL;
     for (u32 i = 0; i < s_tarCount; i++) {
         if (strcasecmp(s_tarIndex[i].filename, filename) == 0) {
             return &s_tarIndex[i];
@@ -36,7 +41,7 @@ ArtTarEntry *findTarEntry(const char *filename) {
     return NULL;
 }
 
-int loadTarFile(const char *path) 
+int loadTarFile(const char *path)
 {
     if (s_tarFd >= 0 || s_tarIndex)
         closeTarFile();
@@ -66,7 +71,7 @@ int loadTarFile(const char *path)
         memcpy(name, header, 20);
         name[20] = '\0';
 
-        u64 rawSize64 = parseOctal((const char*)header + 124, 12);
+        u64 rawSize64 = parseOctal((const char *)header + 124, 12);
         u64 paddedSize64 = ((rawSize64 + (TAR_BLOCK_SIZE - 1)) / TAR_BLOCK_SIZE) * TAR_BLOCK_SIZE;
 
         if (rawSize64 > MAX_FILE_SIZE || paddedSize64 > MAX_FILE_SIZE) {
@@ -102,7 +107,7 @@ int loadTarFile(const char *path)
     }
 }
 
-int closeTarFile(void) 
+int closeTarFile(void)
 {
     if (s_tarFd >= 0) {
         close(s_tarFd);
@@ -119,7 +124,7 @@ int hasTarEntry(const char *filename)
     return findTarEntry(filename) ? 1 : 0;
 }
 
-u32 readFileFromTar(const ArtTarEntry *entry, void *dst, u32 dstSize) 
+u32 readFileFromTar(const ArtTarEntry *entry, void *dst, u32 dstSize)
 {
     if (!entry || s_tarFd < 0 || !dst)
         return 0;
@@ -131,7 +136,7 @@ u32 readFileFromTar(const ArtTarEntry *entry, void *dst, u32 dstSize)
 
     u32 total = 0;
     while (total < entry->rawSize) {
-        int bytesRead = read(s_tarFd, (unsigned char*)dst + total, entry->rawSize - total);
+        int bytesRead = read(s_tarFd, (unsigned char *)dst + total, entry->rawSize - total);
         if (bytesRead <= 0)
             return 0;
 
@@ -140,14 +145,14 @@ u32 readFileFromTar(const ArtTarEntry *entry, void *dst, u32 dstSize)
     return total;
 }
 
-void *getFileFromTar(const char *filename) 
+void *getFileFromTar(const char *filename)
 {
     ArtTarEntry *entry = findTarEntry(filename);
-    if (!entry) 
+    if (!entry)
         return NULL;
 
     void *buffer = malloc(entry->rawSize);
-    if (!buffer) 
+    if (!buffer)
         return NULL;
 
     u32 bytesRead = readFileFromTar(entry, buffer, entry->rawSize);

@@ -2,13 +2,14 @@
 #define __TAR_H
 
 #define TAR_BLOCK_SIZE 512
-#define MAX_FILE_SIZE (4*1024*1024) // 4 MiB
+#define MAX_FILE_SIZE  (4 * 1024 * 1024) // 4 MiB
 
-typedef struct {
-    u64 offset;          // offset of file data in archive
-    u32 rawSize;         // actual file size from header (octal), capped by MAX_FILE_SIZE
-    u32 paddedSize;      // file size rounded up to 512-byte TAR blocks
-    char filename[21];   // filename up to 21 chars + null
+typedef struct
+{
+    u64 offset;        // offset of file data in archive
+    u32 rawSize;       // actual file size from header (octal), capped by MAX_FILE_SIZE
+    u32 paddedSize;    // file size rounded up to 512-byte TAR blocks
+    char filename[21]; // filename up to 21 chars + null
 } ArtTarEntry;
 
 int loadTarFile(const char *path);
