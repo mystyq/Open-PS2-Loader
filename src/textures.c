@@ -429,31 +429,31 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, int a
         readData = &PngFileBufferPtr;
         readFunction = &texReadMemFunction;
     } else if (filePath) {
-            int fd = open(filePath, O_RDONLY, 0);
-            if (fd < 0) {
-                return ERR_BAD_FILE;
-            }
-            int fileSize = lseek(fd, 0, SEEK_END);
-            lseek(fd, 0, SEEK_SET);
+        int fd = open(filePath, O_RDONLY, 0);
+        if (fd < 0) {
+            return ERR_BAD_FILE;
+        }
+        int fileSize = lseek(fd, 0, SEEK_END);
+        lseek(fd, 0, SEEK_SET);
 
-            pFileBuffer = malloc(fileSize);
-            if (pFileBuffer == NULL) {
-                close(fd);
-                return ERR_BAD_FILE; // There's no out of memory error...
-            }
-
-            if (read(fd, pFileBuffer, fileSize) != fileSize) {
-                LOG("texLoadAll: failed to read file %s\n", filePath);
-                free(pFileBuffer);
-                close(fd);
-                return ERR_BAD_FILE;
-            }
-
+        pFileBuffer = malloc(fileSize);
+        if (pFileBuffer == NULL) {
             close(fd);
+            return ERR_BAD_FILE; // There's no out of memory error...
+        }
 
-            PngFileBufferPtr = pFileBuffer;
-            readData = &PngFileBufferPtr;
-            readFunction = &texReadMemFunction;
+        if (read(fd, pFileBuffer, fileSize) != fileSize) {
+            LOG("texLoadAll: failed to read file %s\n", filePath);
+            free(pFileBuffer);
+            close(fd);
+            return ERR_BAD_FILE;
+        }
+
+        close(fd);
+
+        PngFileBufferPtr = pFileBuffer;
+        readData = &PngFileBufferPtr;
+        readFunction = &texReadMemFunction;
     } else {
         if (texId == -1 || !internalDefault[texId].texture)
             return ERR_BAD_FILE;
@@ -498,7 +498,7 @@ static int texLoadAll(GSTEXTURE *texture, const char *filePath, int texId, int a
     png_set_filler(pngPtr, 0xff, PNG_FILLER_AFTER);
     png_read_update_info(pngPtr, infoPtr);
 
-    void (*texPngReadPixels)(GSTEXTURE * texture, png_bytep * rowPointers, size_t size);
+    void (*texPngReadPixels)(GSTEXTURE *texture, png_bytep *rowPointers, size_t size);
     switch (png_get_color_type(pngPtr, infoPtr)) {
         case PNG_COLOR_TYPE_RGB_ALPHA:
             texture->PSM = GS_PSM_CT32;
