@@ -363,7 +363,7 @@ static image_texture_t *initImageTexture(const char *themePath, config_set_t *th
     if (themePath) {
         char path[256];
         snprintf(path, sizeof(path), "%s%s", themePath, imgName);
-        if (texDiscoverLoad(&texture->source, path, texId) >= 0)
+        if (texDiscoverLoad(&texture->source, path, texId, 0) >= 0)
             ;
         result = 1;
     } else {
@@ -1183,7 +1183,7 @@ static int thmLoadResource(GSTEXTURE *texture, int texId, const char *themePath,
     int success = -1;
 
     if (themePath != NULL)
-        success = texDiscoverLoad(texture, themePath, texId); // only set success here
+        success = texDiscoverLoad(texture, themePath, texId, 0); // only set success here
 
     if ((success < 0) && useDefault)
         texLoadInternal(texture, texId); // we don't mind the result of "default"
