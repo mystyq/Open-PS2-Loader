@@ -174,7 +174,7 @@ int loadTarFile(const char *path)
     const char *cachePath = "art_cache.bin";
 
     char fullCachePath[256];
-    snprintf(fullCachePath, sizeof(fullCachePath), "%s%s", dirPath, "art_cache.bin");
+    snprintf(fullCachePath, sizeof(fullCachePath), "%s%s", dirPath, cachePath);
 
     if (s_tarFd >= 0 || s_tarIndex)
         closeTarFile();
