@@ -3,6 +3,16 @@
 
 #define TAR_BLOCK_SIZE 512
 #define MAX_FILE_SIZE  (4 * 1024 * 1024) // 4 MiB
+#define ARC_MAGIC      "ARC\0"
+#define ARC_VERSION    1
+
+typedef struct ArtCacheHeader
+{
+    char magic[4];
+    u32 version;
+    u64 tarSize;
+    u32 entryCount;
+} ArtCacheHeader;
 
 typedef struct
 {
