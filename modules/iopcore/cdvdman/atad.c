@@ -37,7 +37,7 @@
 #include <errno.h>
 #endif
 
-//#define NETLOG_DEBUG
+// #define NETLOG_DEBUG
 
 #ifdef NETLOG_DEBUG
 // !!! netlog exports functions pointers !!!
@@ -56,6 +56,8 @@ extern int netlog_inited;
 
 #define BANNER  "ATA device driver %s - Copyright (c) 2003 Marcus R. Brown\n"
 #define VERSION "v1.2"
+
+extern int opl_mode_flag;
 
 extern char lba_48bit;
 static u8 ata_gamestar_workaround = 0;
@@ -119,6 +121,27 @@ static void ata_set_dir(int dir);
 static void ata_shutdown_cb(void);
 
 int ata_device_sector_io_internal(int device, void *buf, u64 lba, u32 nsectors, int dir);
+
+/* Wait indefinitely for the drive to become ready at boot. */
+static int ata_wait_until_ready(void)
+{
+    USE_ATA_REGS;
+
+    for (;;) {
+        u8 status = ata_hwport->r_status;
+
+        if (!(status & ATA_STAT_BUSY) && (status & ATA_STAT_DRDY))
+            return 0;
+
+        if (status & ATA_STAT_ERR) {
+            M_PRINTF("ATA: wait_ready ERR: status=0x%02x err=0x%02x\n",
+                     status, sceAtaGetError());
+            return ATA_RES_ERR_IO;
+        }
+
+        DelayThread(10 * 1000);
+    }
+}
 
 /* In v1.04, DMA was enabled in ata_set_dir() instead. */
 static void ata_pre_dma_cb(int bcr, int dir)
@@ -205,6 +228,15 @@ int atad_start(void)
     bdm_connect_bd(&g_ata_bd);
 #endif
 
+    if (opl_mode_flag) {
+        int rdy = ata_wait_until_ready();
+        if (rdy < 0) {
+            M_PRINTF("ATA: drive never became ready at boot, res=%d\n", rdy);
+            res = rdy;
+            goto out;
+        }
+    }
+
     res = 0;
     M_PRINTF("Driver loaded.\n");
 out:
@@ -241,7 +273,7 @@ int sceAtaGetError(void)
 #define ata_wait_bus_busy() gen_ata_wait_busy(ATA_WAIT_BUSBUSY)
 
 /* 0x80 for busy, 0x88 for bus busy.
-	In the original ATAD, the busy and bus-busy functions were separate, but similar.  */
+    In the original ATAD, the busy and bus-busy functions were separate, but similar.  */
 static int gen_ata_wait_busy(int bits)
 {
     USE_ATA_REGS;
@@ -293,20 +325,20 @@ static int ata_device_select(int device)
     /* Select the device.  */
     ata_hwport->r_select = (device & 1) << 4;
     (void)(ata_hwport->r_control);
-    (void)(ata_hwport->r_control); //Only done once in v1.04.
+    (void)(ata_hwport->r_control); // Only done once in v1.04.
 
     return ata_wait_bus_busy();
 }
 
 /* Export 6 */
 /*
-	28-bit LBA:
-		sector	(7:0)	-> LBA (7:0)
-		lcyl	(7:0)	-> LBA (15:8)
-		hcyl	(7:0)	-> LBA (23:16)
-		device	(3:0)	-> LBA (27:24)
+    28-bit LBA:
+        sector	(7:0)	-> LBA (7:0)
+        lcyl	(7:0)	-> LBA (15:8)
+        hcyl	(7:0)	-> LBA (23:16)
+        device	(3:0)	-> LBA (27:24)
 
-	48-bit LBA just involves writing the upper 24 bits in the format above into each respective register on the first write pass, before writing the lower 24 bits in the 2nd write pass. The LBA bits within the device field are not used in either write pass.
+    48-bit LBA just involves writing the upper 24 bits in the format above into each respective register on the first write pass, before writing the lower 24 bits in the 2nd write pass. The LBA bits within the device field are not used in either write pass.
 */
 int sceAtaExecCmd(void *buf, u32 blkcount, u16 feature, u16 nsector, u16 sector, u16 lcyl, u16 hcyl, u16 select, u16 command)
 {
@@ -323,7 +355,7 @@ int sceAtaExecCmd(void *buf, u32 blkcount, u16 feature, u16 nsector, u16 sector,
         return res;
 
     /* For the SCE and SMART commands, we need to search on the subcommand
-	specified in the feature register.  */
+    specified in the feature register.  */
     if (command == ATA_C_SMART) {
         cmd_table = smart_cmd_table;
         cmd_table_size = SMART_CMD_TABLE_SIZE;
@@ -342,13 +374,13 @@ int sceAtaExecCmd(void *buf, u32 blkcount, u16 feature, u16 nsector, u16 sector,
         }
     }
 
-    if (!(atad_cmd_state.type = type & 0x7F)) //Non-SONY: ignore the 48-bit LBA flag.
+    if (!(atad_cmd_state.type = type & 0x7F)) // Non-SONY: ignore the 48-bit LBA flag.
         return ATA_RES_ERR_CMD;
 
     atad_cmd_state.buf = buf;
     atad_cmd_state.blkcount = blkcount;
 
-    /* Check that the device is ready if this the appropiate command.  */
+    /* Check that the device is ready if this the appropriate command.  */
     if (!(ata_hwport->r_control & 0x40)) {
         switch (command) {
             case ATA_C_DEVICE_RESET:
@@ -356,16 +388,26 @@ int sceAtaExecCmd(void *buf, u32 blkcount, u16 feature, u16 nsector, u16 sector,
             case ATA_C_INITIALIZE_DEVICE_PARAMETERS:
             case ATA_C_PACKET:
             case ATA_C_IDENTIFY_PACKET_DEVICE:
+                /* These are allowed even if the device isn't "ready". */
                 break;
+
             default:
-                M_PRINTF("Error: Device %d is not ready.\n", device);
-                return ATA_RES_ERR_NOTREADY;
+                M_PRINTF("Device %d not ready, waiting...\n", device);
+
+                if (opl_mode_flag) {
+                    int rdy = ata_wait_until_ready();
+                    if (rdy < 0) {
+                        M_PRINTF("Device %d failed to become ready, res=%d\n", device, rdy);
+                        return rdy;
+                    }
+                }
+                break;
         }
     }
 
     /* Does this command need a timeout?  */
     using_timeout = 0;
-    switch (type & 0x7F) { //Non-SONY: ignore the 48-bit LBA flag.
+    switch (type & 0x7F) { // Non-SONY: ignore the 48-bit LBA flag.
         case 1:
         case 6:
             using_timeout = 1;
@@ -391,11 +433,11 @@ int sceAtaExecCmd(void *buf, u32 blkcount, u16 feature, u16 nsector, u16 sector,
     /* Finally!  We send off the ATA command with arguments.  */
     ata_hwport->r_control = (using_timeout == 0) << 1;
 
-    if (type & 0x80) { //For the sake of achieving (greatly) improved performance, write the registers twice only if required! This is also required for compatibility with the buggy firmware of certain PSX units.
+    if (type & 0x80) { // For the sake of achieving (greatly) improved performance, write the registers twice only if required! This is also required for compatibility with the buggy firmware of certain PSX units.
         /* 48-bit LBA requires writing to the address registers twice,
-		   24 bits of the LBA address is written each time.
-		   Writing to registers twice does not affect 28-bit LBA since
-		   only the latest data stored in address registers is used.  */
+           24 bits of the LBA address is written each time.
+           Writing to registers twice does not affect 28-bit LBA since
+           only the latest data stored in address registers is used.  */
         ata_hwport->r_feature = (feature >> 8) & 0xff;
         ata_hwport->r_nsector = (nsector >> 8) & 0xff;
         ata_hwport->r_sector = (sector >> 8) & 0xff;
@@ -408,7 +450,7 @@ int sceAtaExecCmd(void *buf, u32 blkcount, u16 feature, u16 nsector, u16 sector,
     ata_hwport->r_sector = sector & 0xff;
     ata_hwport->r_lcyl = lcyl & 0xff;
     ata_hwport->r_hcyl = hcyl & 0xff;
-    ata_hwport->r_select = (select | ATA_SEL_LBA) & 0xff; //In v1.04, LBA was enabled in the sceAtaDmaTransfer function.
+    ata_hwport->r_select = (select | ATA_SEL_LBA) & 0xff; // In v1.04, LBA was enabled in the sceAtaDmaTransfer function.
     ata_hwport->r_command = command & 0xff;
 
     /* Turn on the LED.  */
@@ -576,10 +618,23 @@ int sceAtaWaitResult(void)
     /* Wait until the device isn't busy.  */
     if (ata_hwport->r_status & ATA_STAT_BUSY)
         res = ata_wait_busy();
-    if ((stat = ata_hwport->r_status) & ATA_STAT_ERR) {
-        M_PRINTF("Error: Command error: status 0x%02x, error 0x%02x.\n", stat, sceAtaGetError());
-        /* In v1.04, there was no check for ICRC. */
-        res = (sceAtaGetError() & ATA_ERR_ICRC) ? ATA_RES_ERR_ICRC : ATA_RES_ERR_IO;
+
+    if (!res) {
+        stat = ata_hwport->r_status;
+        if (stat & ATA_STAT_ERR) {
+            M_PRINTF("Error: Command error: status 0x%02x, error 0x%02x.\n",
+                     stat, sceAtaGetError());
+            /* In v1.04, there was no check for ICRC. */
+            res = (sceAtaGetError() & ATA_ERR_ICRC) ? ATA_RES_ERR_ICRC : ATA_RES_ERR_IO;
+        }
+    }
+
+    if (opl_mode_flag) {
+        int rdy = ata_wait_until_ready();
+        if (rdy < 0) {
+            M_PRINTF("ATA: drive not ready after command, res=%d\n", rdy);
+            res = rdy;
+        }
     }
 
 finish:
@@ -691,7 +746,7 @@ static void ata_set_dir(int dir)
     val = SPD_REG16(SPD_R_IF_CTRL) & 1;
     val |= (dir == ATA_DIR_WRITE) ? 0x4c : 0x4e;
     SPD_REG16(SPD_R_IF_CTRL) = val;
-    SPD_REG16(SPD_R_XFR_CTRL) = dir | (ata_gamestar_workaround ? 0x86 : 0x6); //In v1.04, DMA was enabled here (0x86 instead of 0x6)
+    SPD_REG16(SPD_R_XFR_CTRL) = dir | (ata_gamestar_workaround ? 0x86 : 0x6); // In v1.04, DMA was enabled here (0x86 instead of 0x6)
 }
 
 static int ata_device_standby_immediate(int device)

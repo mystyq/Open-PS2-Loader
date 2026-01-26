@@ -15,6 +15,8 @@ struct CDVDMAN_SETTINGS_TYPE cdvdman_settings = {
     CDVDMAN_SETTINGS_DEFAULT_COMMON,
     CDVDMAN_SETTINGS_DEFAULT_DEVICE_SETTINGS};
 
+int opl_mode_flag = 1;
+
 //----------------------------------------------------
 extern struct irx_export_table _exp_cdvdman;
 extern struct irx_export_table _exp_cdvdstm;
@@ -362,7 +364,7 @@ static int cdvdman_read(u32 lsn, u32 sectors, u16 sector_size, void *buf)
     if (sector_size == 2340)
         offset = 12; // head - sub - data(2048) -- edc-ecc
 
-    if ((u32)(buf)&3 || (sector_size != 2048)) {
+    if ((u32)(buf) & 3 || (sector_size != 2048)) {
         // For transfers to unaligned buffers, a double-copy is required to avoid stalling the device's DMA channel.
         WaitSema(cdvdman_searchfilesema);
 

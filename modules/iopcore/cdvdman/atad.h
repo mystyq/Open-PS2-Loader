@@ -47,6 +47,12 @@ typedef struct _ata_devinfo
 #define ATA_RES_ERR_LOCKED   -509
 #define ATA_RES_ERR_ICRC     -510
 
+/* status definitions */
+#define ATA_STAT_BUSY 0x80
+#define ATA_STAT_DRQ  0x08
+#define ATA_STAT_ERR  0x01
+#define ATA_STAT_DRDY 0x40
+
 int atad_start(void);
 ata_devinfo_t *sceAtaInit(int device);
 int sceAtaExecCmd(void *buf, u32 blkcount, u16 feature, u16 nsector, u16 sector, u16 lcyl, u16 hcyl, u16 select, u16 command);

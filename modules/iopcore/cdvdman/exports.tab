@@ -125,6 +125,7 @@ DECLARE_EXPORT_TABLE(cdvdman, 1, 1)
 	DECLARE_EXPORT(_dummy)
 	DECLARE_EXPORT(_dummy)
 	DECLARE_EXPORT(_dummy)
+	DECLARE_EXPORT(opl_mode_flag)
 END_EXPORT_TABLE
 
 // cdvdstm export table

@@ -12,3 +12,7 @@ ioman_IMPORTS_end
 sysclib_IMPORTS_start
 I_strcmp
 sysclib_IMPORTS_end
+
+DECLARE_IMPORT_TABLE(cdvdman, 1, 1)
+    DECLARE_IMPORT(0, opl_mode_flag)
+END_IMPORT_TABLE
