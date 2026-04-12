@@ -1,5 +1,3 @@
-void _funcret(){};
-
 DECLARE_EXPORT_TABLE(httpc, 1, 1)
 	DECLARE_EXPORT(_start)
 	DECLARE_EXPORT(_exit)
@@ -9,3 +7,5 @@ DECLARE_EXPORT_TABLE(httpc, 1, 1)
 	DECLARE_EXPORT(HttpCloseConnection)
 	DECLARE_EXPORT(HttpSendGetRequest)
 END_EXPORT_TABLE
+
+void _funcret(){};
