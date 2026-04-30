@@ -668,25 +668,31 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     int count = mdl->support->itemUpdate(mdl->support);
     if (count > 0) {
         int i;
+        int chunk_size = 32;
 
-        for (i = 0; i < count; ++i) {
+        for (i = 0; i < count; i += chunk_size) {
+            int chunk_end = (i + chunk_size < count) ? i + chunk_size : count;
 
-            gup = guiOpCreate(GUI_OP_APPEND_MENU);
+            for (int j = i; j < chunk_end; ++j) {
+                gup = guiOpCreate(GUI_OP_APPEND_MENU);
 
-            gup->menu.menu = &mdl->menuItem;
-            gup->menu.subMenu = &mdl->subMenu;
+                gup->menu.menu = &mdl->menuItem;
+                gup->menu.subMenu = &mdl->subMenu;
 
-            gup->submenu.icon_id = -1;
-            gup->submenu.id = i;
-            gup->submenu.text = mdl->support->itemGetName(mdl->support, i);
-            gup->submenu.text_id = -1;
-            gup->submenu.selected = 0;
+                gup->submenu.icon_id = -1;
+                gup->submenu.id = j;
+                gup->submenu.text = mdl->support->itemGetName(mdl->support, j);
+                gup->submenu.text_id = -1;
+                gup->submenu.selected = 0;
 
-            if (gRememberLastPlayed && temp && strcmp(temp, mdl->support->itemGetStartup(mdl->support, i)) == 0) {
-                gup->submenu.selected = 1; // Select Last Played Game
+                if (gRememberLastPlayed && temp && strcmp(temp, mdl->support->itemGetStartup(mdl->support, j)) == 0) {
+                    gup->submenu.selected = 1; // Select Last Played Game
+                }
+
+                guiDeferUpdate(gup);
             }
 
-            guiDeferUpdate(gup);
+            guiExecDeferredOps();
         }
     }
 
