@@ -650,6 +650,23 @@ config_set_t *oplGetLegacyAppsInfo(char *name)
 // ----------------------------------------------------------
 // ----------------------- Updaters -------------------------
 // ----------------------------------------------------------
+static opl_io_module_t *gSortModule = NULL;
+
+static void sortSetModule(opl_io_module_t *mdl)
+{
+    gSortModule = mdl;
+}
+
+static int gameNameComparator(const void *a, const void *b)
+{
+    int ia = *(const int *)a;
+    int ib = *(const int *)b;
+
+    return strcasecmp(
+        gSortModule->support->itemGetName(gSortModule->support, ia),
+        gSortModule->support->itemGetName(gSortModule->support, ib));
+}
+
 static void updateMenuFromGameList(opl_io_module_t *mdl)
 {
     guiExecDeferredOps();
@@ -667,13 +684,24 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
     struct gui_update_t *gup = NULL;
     int count = mdl->support->itemUpdate(mdl->support);
     if (count > 0) {
-        int i;
+
+        int order[count];
+        for (int i = 0; i < count; i++)
+            order[i] = i;
+
+        if (gAutosort) {
+            sortSetModule(mdl);
+            qsort(order, count, sizeof(int), gameNameComparator);
+        }
+
         int chunk_size = 32;
 
-        for (i = 0; i < count; i += chunk_size) {
+        for (int i = 0; i < count; i += chunk_size) {
             int chunk_end = (i + chunk_size < count) ? i + chunk_size : count;
 
-            for (int j = i; j < chunk_end; ++j) {
+            for (int k = i; k < chunk_end; k++) {
+                int j = order[k];
+
                 gup = guiOpCreate(GUI_OP_APPEND_MENU);
 
                 gup->menu.menu = &mdl->menuItem;
@@ -687,6 +715,7 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
 
                 if (gRememberLastPlayed && temp && strcmp(temp, mdl->support->itemGetStartup(mdl->support, j)) == 0) {
                     gup->submenu.selected = 1; // Select Last Played Game
+                    mdl->menuItem.remindLast = 1;
                 }
 
                 guiDeferUpdate(gup);
@@ -696,11 +725,11 @@ static void updateMenuFromGameList(opl_io_module_t *mdl)
         }
     }
 
-    if (gAutosort) {
-        gup = guiOpCreate(GUI_OP_SORT);
-        gup->menu.menu = &mdl->menuItem;
-        gup->menu.subMenu = &mdl->subMenu;
-        guiDeferUpdate(gup);
+    mdl->menuItem.submenu = mdl->subMenu;
+
+    if (!mdl->menuItem.remindLast) {
+        mdl->menuItem.current = mdl->menuItem.submenu;
+        mdl->menuItem.pagestart = mdl->menuItem.submenu;
     }
 }
 
